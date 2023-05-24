@@ -203,11 +203,10 @@ export function create_buffer_info_from_arrays(gl, arrays) {
         gl.bindBuffer(type, buffer);
         
         // checking the type of the array and using the appropriate bufferData
-        if (array.data instanceof Float32Array) {
+        if (array.data instanceof Float32Array || array.data instanceof Uint16Array) {
             gl.bufferData(type, array.data, gl.STATIC_DRAW); 
-        } else if (array instanceof Uint16Array) {
-            gl.bufferData(type, array.data, gl.STATIC_DRAW);
         }
+
         return buffer;
     }
 
@@ -242,7 +241,7 @@ export function create_buffer_info_from_arrays(gl, arrays) {
     const indices = arrays.indices;
 
     if (indices) {
-        buffer_info.num_elements = indices.length;
+        buffer_info.num_elements = indices.data.length;
         buffer_info.indices = create_buffer_from_array(gl, indices, gl.ELEMENT_ARRAY_BUFFER);
     } else {
         buffer_info.num_elements = get_num_elements_from_non_indexed_arrays(arrays);

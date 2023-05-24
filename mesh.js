@@ -3,9 +3,9 @@ export function create_sphere(radius) {
     var normals = [];
     var indices = [];
 
-    var latitudeBands = 10;
-    var longitudeBands = 10;
-    var radius = 2.5;
+    var latitudeBands = 30;
+    var longitudeBands = 30;
+    var radius = radius;
 
     for (var latNumber = 0; latNumber <= latitudeBands; ++latNumber) {
         var theta = latNumber * Math.PI / latitudeBands;

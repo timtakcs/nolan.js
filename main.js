@@ -1,10 +1,18 @@
 import "./gl-matrix.js";
-import { create_sphere } from "./mesh.js";
-import { create_program, resize_canvas, compile_shader,
-		 create_attribute_setters, create_uniform_setters,
-		 create_buffer_info_from_arrays,
-		 set_buffers_and_attributes, set_uniforms } from "./webgl_helpers.js";
 const { mat2, mat2d, mat4, mat3, quat, quat2, vec2, vec3, vec4 } = glMatrix;
+
+import { InputManager } from "./input_manager.js";
+import { Camera } from "./camera.js";
+import { Scene } from "./scene.js";
+
+import { create_sphere } from "./mesh.js";
+
+import {
+	create_program, resize_canvas, compile_shader,
+	create_attribute_setters, create_uniform_setters,
+	create_buffer_info_from_arrays,
+	set_buffers_and_attributes, set_uniforms
+} from "./webgl_helpers.js";
 
 // ###########################
 // helper functions
@@ -25,10 +33,10 @@ var vertex_shader_source = [
 	'attribute vec3 normal;',
 	'varying vec3 frag_normal;',
 	'uniform mat4 u_matrix;',
-	'uniform mat4 u_world_location;',
+	'uniform mat4 u_world_matrix;',
 	'',
 	'void main() {',
-	'	frag_normal = mat3(u_world_location) * normal;',
+	'	frag_normal = mat3(u_world_matrix) * normal;',
 	'	gl_Position = u_matrix * vec4(pos, 1.0);',
 	'}'
 ].join("\n");
@@ -41,95 +49,38 @@ var fragment_shader_source = [
 	'uniform vec4 u_color;',
 	'',
 	'void main() {',
-	'	float light = dot(frag_normal, u_reverse_light);',
+	'	vec3 normal = normalize(frag_normal);',
+	'	float light = dot(normal, u_reverse_light);',
 	'	gl_FragColor = u_color;',
-	'	gl_FragColor.rgb *= light;',
+	// '	gl_FragColor.rgb *= light;',
 	'}'
 ].join("\n");
 
-var triangle = [
-	-5.0, 0.0, 3.0, 0.0, 1.0, 1.0,
-	5.0, 0.0, -3.0, 0.0, 1.0, 1.0,
-	0.0, 7.0, 0.0, 0.0, 1.0, 1.0,
-]
-
 var pyramid = [
 	-1.0, 0.0, 1.0,
+	0.0, 3.0, 0.0,
+	-1.0, 0.0, -1.0,
+
+	1.0, 0.0, 1.0,
+	0.0, 3.0, 0.0,
+	-1.0, 0.0, 1.0,
+
 	-1.0, 0.0, -1.0,
 	0.0, 3.0, 0.0,
+	1.0, 0.0, -1.0,
 
-	1.0, 0.0, 1.0,
-	-1.0, 0.0, 1.0,
-	0.0, 3.0, 0.0,
-
-	-1.0, 0.0, -1.0,
 	1.0, 0.0, -1.0,
 	0.0, 3.0, 0.0,
-
-	1.0, 0.0, -1.0,
 	1.0, 0.0, 1.0,
-	0.0, 3.0, 0.0,
 
 	-1.0, 0.0, 1.0,
 	1.0, 0.0, -1.0,
 	1.0, 0.0, 1.0,
 
-	-1.0, 0.0, 1.0,
 	1.0, 0.0, -1.0,
+	-1.0, 0.0, 1.0,
 	-1.0, 0.0, -1.0,
 ]
-
-// ###########################
-// webgl boilerplate
-// ###########################
-
-// function resize_canvas(canvas) {
-// 	const displayWidth = canvas.clientWidth;
-// 	const displayHeight = canvas.clientHeight;
-
-// 	const needResize = canvas.width !== displayWidth || canvas.height !== displayHeight;
-
-// 	if (needResize) {
-// 		canvas.width = displayWidth;
-// 		canvas.height = displayHeight;
-// 	}
-
-// 	return needResize;
-// }
-
-// /** @param{WebGLRenderingContext} gl */
-// function compile_shader(gl, type, source) {
-// 	var shader = gl.createShader(type);
-// 	gl.shaderSource(shader, source);
-// 	gl.compileShader(shader);
-// 	var ok = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
-// 	if (ok) {
-// 		console.log(`Compiled ${type} shader successfully`);
-// 		return shader;
-// 	}
-
-// 	console.log("Failed to compile shader");
-// 	console.log(gl.getShaderInfoLog(shader));
-// 	gl.deleteShader(shader);
-// }
-
-// /** @param{WebGLRenderingContext} gl */
-// function create_program(gl, vertex_shader, fragment_shader) {
-// 	var program = gl.createProgram();
-// 	gl.attachShader(program, vertex_shader);
-// 	gl.attachShader(program, fragment_shader);
-// 	gl.linkProgram(program);
-
-// 	var ok = gl.getProgramParameter(program, gl.LINK_STATUS);
-// 	if (ok) {
-// 		console.log("Program linked successfully");
-// 		return program;
-// 	}
-
-// 	console.log("Failed to link program");
-// 	console.log(gl.getProgramInfoLog(program));
-// 	gl.deleteProgram(program);
-// }
 
 // ###########################
 // graphics helper functions
@@ -195,138 +146,184 @@ function main() {
 	gl.frontFace(gl.CCW);
 	gl.cullFace(gl.BACK);
 
-	// compiling shaders
+	//###########################
+	// fps counter
+	//###########################
+	const fpsElem = document.querySelector("#fps");
+	const frameTimes = [];
+	let frameCursor = 0;
+	let numFrames = 0;
+	const maxFrames = 20;
+	let totalFPS = 0;
+	let then = 0;
+
+	function compute_average_fps(now) {
+		now *= 0.001;
+		const deltaTime = now - then;
+		then = now;
+		const fps = 1 / deltaTime;
+
+		fpsElem.textContent = fps.toFixed(1);
+		totalFPS += fps - (frameTimes[frameCursor] || 0);
+		frameTimes[frameCursor++] = fps;
+		numFrames = Math.max(numFrames, frameCursor);
+		frameCursor %= maxFrames;
+		const averageFPS = totalFPS / numFrames;
+
+		return averageFPS;
+	}
+
+	// ###########################
+	// init time
+	// ###########################
+
+	// var sphere_return = create_sphere(2.5);
+
+	// var position = pyramid;
+	// var normals = calculate_normals(pyramid);
+	// var indices = [];
+
+	// // console.log(indices);
+
+	// var uniform_reverse_light = [0.5, 0.0, 1.0];
+	// var uniform_color = [0.0, 0.25, 1.0, 1.0];
+	// var normals = calculate_normals(pyramid);
+
+	// var attribute_arrays = {
+	// 	pos: { size: 3, data: new Float32Array(position) },
+	// 	normal: { size: 3, data: new Float32Array(normals) },
+	// 	indices: { size: 1, data: new Uint16Array(indices) },
+	// };
 
 	// var vertex_shader = compile_shader(gl, gl.VERTEX_SHADER, vertex_shader_source);
 	// var fragment_shader = compile_shader(gl, gl.FRAGMENT_SHADER, fragment_shader_source);
 
 	// var program = create_program(gl, vertex_shader, fragment_shader);
 
+	// var attribute_setters = create_attribute_setters(gl, program);
 
-	// resize_canvas(canvas);
-	// gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+	// var buffer_info = create_buffer_info_from_arrays(gl, attribute_arrays);
 
-	// var pos_attrib_location = gl.getAttribLocation(program, 'pos');
-	// var normal_attrib_location = gl.getAttribLocation(program, 'normal');
+	// var uniform_setters = create_uniform_setters(gl, program);
 
-	// const icosphere_return = create_sphere(10);
-	// const icosphere_vertices = icosphere_return.vertices;
-	// const icosphere_indices = icosphere_return.indices;
-	// const icosphere_normals = icosphere_return.normals;
+	// gl.useProgram(program);
 
-	// console.log(icosphere_indices);
-	// console.log(icosphere_vertices);
+	// set_buffers_and_attributes(gl, attribute_setters, buffer_info);
 
-	// // loading the data for the shape
+	// goes into the scene class once it is figured out
+	function compute_matrix(view_proj_matrix, translation, rotation_x, rotation_y) {
+		var matrix = mat4.create();
+		mat4.translate(matrix, matrix, translation);
+		mat4.rotateX(matrix, matrix, rotation_x);
+		mat4.rotateY(matrix, matrix, rotation_y);
+		mat4.multiply(matrix, view_proj_matrix, matrix);
+		return matrix;
+	}
 
-	// gl.enableVertexAttribArray(pos_attrib_location);
+	//###########################
+	// render loop
+	//###########################
 
-	// var pos_buffer = gl.createBuffer();
-	// gl.bindBuffer(gl.ARRAY_BUFFER, pos_buffer);
-	// gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(icosphere_vertices), gl.STATIC_DRAW);
+	function get_random_rgb_value() {
+        return [Math.random(), Math.random(), Math.random(), 1.0];
+    }
 
-	// var size = 3;
-	// var type = gl.FLOAT;
-	// var normalize = false;
-	// var stride = 0
-	// var offset = 0;
-	// gl.vertexAttribPointer(pos_attrib_location, size, type, normalize, stride, offset);
+	// var angle = 0;
 
-	// // loading the indices for an icosphere
+	// var proj_matrix = mat4.create();
+	// var camera_matrix = mat4.create();
+	// var view_matrix = mat4.create();
+	// var view_proj_matrix = mat4.create();
 
-	// var index_buffer = gl.createBuffer();
-	// gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
-	// gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(icosphere_indices), gl.STATIC_DRAW);
+	// var input_manager = new InputManager(canvas);
+	// var camera = new Camera(canvas.clientHeight, canvas.clientHeight);
 
-	// // loading the data for the normals
+	var scene = new Scene(gl, canvas.clientHeight, canvas.clientWidth, canvas);
+	scene.init_program(vertex_shader_source, fragment_shader_source);
 
-	// var normal_buffer = gl.createBuffer();
-	// gl.bindBuffer(gl.ARRAY_BUFFER, normal_buffer);
-	// // var normals = calculate_normals(icosphere_vertices);
-	// gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(icosphere_normals), gl.STATIC_DRAW);
+	// var objects_to_render = [];
 
-	// gl.enableVertexAttribArray(normal_attrib_location);
+	// var sphere_uniforms = {
+	// 	u_reverse_light: {data: new Float32Array(uniform_reverse_light)},
+	// 	u_color: {data: new Float32Array(4)},
+	// 	u_matrix: {data: mat4.create()},
+	// 	u_world: {data: mat4.create()},
+	// };
 
-	// var size = 3;
-	// var type = gl.FLOAT;
-	// var normalize = false;
-	// var stride = 0
-	// var offset = 0
-	// gl.vertexAttribPointer(normal_attrib_location, size, type, normalize, stride, offset);
+	// for (var i = 0; i < 3; i++) {
+	// 	sphere_uniforms.u_color.data = get_random_rgb_value();
 
-	// testing
-	var uniform_reverse_light = [-0.5, 0.0, -1.0];
-	var uniform_color = [0.0, 0.25, 1.0, 1.0];
-	var normals = calculate_normals(pyramid);
+	// 	var obj = {
+	// 		uniforms: sphere_uniforms,
+	// 		translation: [i * 3, i * 2, 0],
+	// 		rotation_x: i * 0.5,
+	// 		rotation_y: 0,
+	// 	};
 
-	console.log(normals);
+	// 	objects_to_render.push(obj);
+	// }
 
-	var vertex_shader = compile_shader(gl, gl.VERTEX_SHADER, vertex_shader_source);
-	var fragment_shader = compile_shader(gl, gl.FRAGMENT_SHADER, fragment_shader_source);
+	for (var i = 0; i < 3; i++) {
+		var radius = 2.0;
+		var sphere_return = create_sphere(radius);
+		
+		var vertices = pyramid;
+		var normals = calculate_normals(pyramid);
+		var indices = [];
 
-	var program = create_program(gl, vertex_shader, fragment_shader);
+		var translation = [i * 3, i * 2, 0];
+		var rotation_x = i * 0.5;
+		var rotation_y = 0;
 
-	var attribute_arrays = {
-		pos: { size: 3, data: new Float32Array(pyramid) },
-		normal: { size: 3, data: new Float32Array(normals) },
-	};
+		scene.add_object(vertices, normals, indices, translation, rotation_x, rotation_y);
+	}
+	
+	var render = function (now) {
+		// calculate fps
+		fpsElem.textContent = compute_average_fps(now).toFixed(1);
 
-	var uniform_arrays = {
-		u_reverse_light: { data: new Float32Array(uniform_reverse_light) },
-		u_color: { data: new Float32Array(uniform_color) },
-	};
-
-	var buffer_info = create_buffer_info_from_arrays(gl, attribute_arrays);
-
-	var uniform_setters = create_uniform_setters(gl, program);
-
-	var attribute_setters = create_attribute_setters(gl, program);
-
-	gl.useProgram(program);
-
-	set_buffers_and_attributes(gl, attribute_setters, buffer_info);
-	set_uniforms(uniform_setters, uniform_arrays);
-	// end testing
-
-	// create the matrix for the scene render
-
-	var view_matrix = new Float32Array(16);
-	var proj_matrix = new Float32Array(16);
-	var world_matrix = new Float32Array(16);
-
-	var u_mat_uniform_location = gl.getUniformLocation(program, 'u_matrix');
-	var u_normal_rotation_uniform_location = gl.getUniformLocation(program, 'u_world_location');
-	// var u_color_uniform_location = gl.getUniformLocation(program, 'u_color');
-	// var u_reverse_light_location = gl.getUniformLocation(program, 'u_reverse_light');
-
-	// var reverse_light = [-0.5, 0.0, -1.0];
-
-	// gl.uniform4fv(u_color_uniform_location, [0.0, 0.25, 1.0, 1.0]);
-	// gl.uniform3fv(u_reverse_light_location, reverse_light);
-
-	var angle = 0;
-
-	var loop = function () {
-
-		mat4.identity(world_matrix);
-		mat4.lookAt(view_matrix, [0, 1, 10], [0, 0, 0], [0, 1, 0]);
-		mat4.perspective(proj_matrix, to_radians(45), canvas.clientWidth / canvas.clientHeight, 0.1, 1000.0);
-		mat4.mul(proj_matrix, proj_matrix, view_matrix);
-		mat4.mul(proj_matrix, proj_matrix, world_matrix);
-
-		angle = performance.now() / 1000 / 6 * 2 * Math.PI;
-		// mat4.rotate(proj_matrix, proj_matrix, angle, [0, 1, 0]);
-		gl.uniformMatrix4fv(u_mat_uniform_location, false, proj_matrix);
-		gl.uniformMatrix4fv(u_normal_rotation_uniform_location, false, proj_matrix);
-
-		gl.clearColor(0.25, 0.0, 0.7, 0.45);
+		gl.clearColor(0.0, 0.25, 0.0, 0.5);
 		gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
-		gl.drawArrays(gl.TRIANGLES, 0, 18);
-		// gl.drawElements(gl.TRIANGLES, icosphere_indices.length, gl.UNSIGNED_SHORT, 0);
 
-		requestAnimationFrame(loop);
+		// handle input
+		// var direction = camera.get_direction();
+
+		// var movement = input_manager.get_move_vector();
+		// var wheel = input_manager.get_wheel_vector(direction);
+
+		// mat4.perspective(proj_matrix, to_radians(45), canvas.clientWidth / canvas.clientHeight, 0.1, 1000.0);
+		// mat4.lookAt(camera_matrix, camera.pos, camera.look_at, [0, 1, 0]);
+		// mat4.invert(view_matrix, camera_matrix);
+		// mat4.mul(view_proj_matrix, proj_matrix, camera_matrix);
+
+		// camera.transform(movement, wheel, view_matrix);
+
+		// angle = performance.now() / 1000 / 12 * 2 * Math.PI;
+
+		scene.draw_scene();
+
+		// return;
+
+
+		// objects_to_render.forEach(function (object) {
+		// 	object.uniforms.u_matrix.data = new Float32Array(compute_matrix(view_proj_matrix, 
+		// 																	object.translation, 
+		// 																	object.rotation_x, 
+		// 																	object.rotation_y));
+
+		// 	console.log(object.uniforms.u_matrix.data);
+
+		// 	// mat4.mul(object.uniforms.u_world_matrix.data, view_proj_matrix, 
+		// 	// object.uniforms.u_matrix.data);
+
+		// 	set_uniforms(uniform_setters, object.uniforms);
+		// 	gl.drawArrays(gl.TRIANGLES, 0, 18);
+		// 	// gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+		// });
+
+		requestAnimationFrame(render);
 	};
-	requestAnimationFrame(loop);
+	requestAnimationFrame(render);
 }
 
 main();
