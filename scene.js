@@ -57,12 +57,11 @@ export class Scene {
 
     draw_object(obj, attribute_setters, uniform_setters) {
         obj.uniforms.u_matrix.data = this.compute_matrix_for_scene_object(this.view_proj_matrix, obj.translation, obj.rotation_x, obj.rotation_y);
-        obj.uniforms.u_matrix.data[0] = 1.33;
 
         set_buffers_and_attributes(this.gl, attribute_setters, obj.buffer_info);
         set_uniforms(uniform_setters, obj.uniforms);
 
-        if (1 != 1) {
+        if (obj.use_indices) {
             this.gl.drawElements(this.gl.TRIANGLES, obj.buffer_info.num_elements, this.gl.UNSIGNED_SHORT, 0);
         } else {
             this.gl.drawArrays(this.gl.TRIANGLES, 0, 18);
@@ -107,7 +106,7 @@ export class Scene {
             u_world_matrix: { data: mat4.create() },
         };
 
-        console.log(object_uniforms.u_matrix.data);
+        console.log(indices);
 
         var obj = {
             uniforms: object_uniforms,
@@ -117,7 +116,7 @@ export class Scene {
             rotation_x: rotation_x,
             rotation_y: rotation_y,
             
-            use_indices: (indices.size === 0) ? false : true,
+            use_indices: (indices.length === 0) ? false : true,
         };
 
         this.objects.push(obj);
