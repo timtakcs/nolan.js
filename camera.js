@@ -2,7 +2,7 @@ const { mat4, vec3, vec4 } = glMatrix;
 
 export class Camera {
     constructor(viewport_width, viewport_height) {
-        this.pos = [0, 0, 10];
+        this.pos = [0, 5, 10];
         this.look_at = [0, 0, 0];
 
         this.translate_sensitivity = 0.01;
@@ -32,14 +32,16 @@ export class Camera {
     transform(mouse_movement, wheel_movement, view_matrix) {
         if (mouse_movement.type === 1) { // linear transformation
             var move = vec4.transformMat4([0, 0, 0, 0], [mouse_movement.x, mouse_movement.y, 0, 0], view_matrix);
+            
+            var distance = vec3.distance(this.pos, this.look_at);
 
-            this.pos[0] += move[0] * this.translate_sensitivity;
-            this.pos[1] += move[1] * this.translate_sensitivity;
-            this.pos[2] += move[2] * this.translate_sensitivity;
+            this.pos[0] += move[0] * this.translate_sensitivity * 0.1 * distance;
+            this.pos[1] += move[1] * this.translate_sensitivity * 0.1 * distance;
+            this.pos[2] += move[2] * this.translate_sensitivity * 0.1 * distance;
 
-            this.look_at[0] += move[0] * this.translate_sensitivity;
-            this.look_at[1] += move[1] * this.translate_sensitivity;
-            this.look_at[2] += move[2] * this.translate_sensitivity;
+            this.look_at[0] += move[0] * this.translate_sensitivity * 0.1 * distance;
+            this.look_at[1] += move[1] * this.translate_sensitivity * 0.1 * distance;
+            this.look_at[2] += move[2] * this.translate_sensitivity * 0.1 * distance;
 
         } else if (mouse_movement.type === 2) { // rotation
             var i = mouse_movement.x;

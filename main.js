@@ -26,34 +26,87 @@ function to_radians(degrees) {
 // shaders and maps
 // ###########################
 
-var vertex_shader_source = [
-	'precision mediump float;',
-	'',
-	'attribute vec3 pos;',
-	'attribute vec3 normal;',
-	'varying vec3 frag_normal;',
-	'uniform mat4 u_matrix;',
-	'uniform mat4 u_world_matrix;',
-	'',
-	'void main() {',
-	'	frag_normal = mat3(u_world_matrix) * normal;',
-	'	gl_Position = u_matrix * vec4(pos, 1.0);',
-	'}'
+var scene_vertex_shader_source = [
+    '#version 300 es',
+    'precision mediump float;',
+    '',
+    'in vec3 pos;',
+    'in vec3 normal;',
+    'out vec3 frag_normal;',
+    'uniform mat4 u_matrix;',
+    'uniform mat4 u_world_matrix;',
+    '',
+    'void main() {',
+    '    frag_normal = mat3(u_world_matrix) * normal;',
+    '    gl_Position = u_matrix * vec4(pos, 1.0);',
+    '}'
 ].join("\n");
 
-var fragment_shader_source = [
-	'precision mediump float;',
+
+var scene_fragment_shader_source = [
+    '#version 300 es',
+    'precision mediump float;',
+    '',
+    'in vec3 frag_normal;',
+    'uniform vec3 u_reverse_light;',
+    'uniform vec4 u_color;',
+    'out vec4 out_color;',
+    '',
+    'void main() {',
+    '    vec3 normal = normalize(frag_normal);',
+    '    float light = dot(normal, u_reverse_light);',
+    '    out_color = u_color;',
+    '    out_color.rgb *= light;',
+    '}'
+].join("\n");
+
+
+var plane_vertex_shader_source = [
+    '#version 300 es',
+    'precision mediump float;',
+    '',
+    // 'in vec3 pos;',
+    'uniform mat4 u_matrix;',
 	'',
-	'varying vec3 frag_normal;',
-	'uniform vec3 u_reverse_light;',
-	'uniform vec4 u_color;',
+	'out vec3 near_point;',
+	'out vec3 far_point;',
+    '',
+    'const vec3 positions[6] = vec3[](',
+    '    vec3(-1.0, 0.0, 1.0),',
+    '    vec3(1.0, 0.0, 1.0),',
+    '    vec3(-1.0, 0.0, -1.0),',
+    '    vec3(-1.0, 0.0, -1.0),',
+    '    vec3(1.0, 0.0, 1.0),',
+    '    vec3(1.0, 0.0, -1.0)',
+    ');',
+    '',
+	'vec3 unproject(float x, float y, float z, mat4 world) {',
+	'   mat4 world_inv = inverse(world);',
+	'   vec4 unprojected_point = world_inv * vec4(x, y, z, 1.0);',
+	'   return unprojected_point.xyz / unprojected_point.w;',
+	'}',
 	'',
-	'void main() {',
-	'	vec3 normal = normalize(frag_normal);',
-	'	float light = dot(normal, u_reverse_light);',
-	'	gl_FragColor = u_color;',
-	'	gl_FragColor.rgb *= light;',
-	'}'
+    'void main() {',
+	'    vec3 p = positions[gl_VertexID].xyz;',
+	'    near_point = unproject(p.x, p.y, 0.0, u_matrix).xyz;',
+	'    far_point = unproject(p.x, p.y, 1.0, u_matrix).xyz;',
+    '    gl_Position = u_matrix * vec4(p, 1.0);',
+    '}'
+].join("\n");
+
+var plane_fragment_shader_source = [
+    '#version 300 es',
+    'precision mediump float;',
+    '',
+	'in vec3 near_point;',
+	'in vec3 far_point;',
+	'',
+    'out vec4 out_color;',
+    '',
+    'void main() {',
+	'    float t = -near_point.y / (far_point.y - near_point.y);',
+    '    out_color = vec4(0.5, 0.0, 0.2, 1.0);',
+    '}'
 ].join("\n");
 
 var pyramid = [
@@ -134,7 +187,7 @@ function calculate_normals(vertices) {
 function main() {
 	const canvas = document.querySelector("#glcanvas");
 	/** @type {WebGLRenderingContext} */
-	const gl = canvas.getContext('webgl');
+	const gl = canvas.getContext('webgl2');
 
 	if (!gl) {
 		console.log("failed to get webgl");
@@ -174,35 +227,73 @@ function main() {
 	}
 
 	//###########################
+	// testing the plane code before putting it in the scene
+	//###########################
+
+	var plane_vertex_shader = compile_shader(gl, gl.VERTEX_SHADER, plane_vertex_shader_source);
+	var plane_fragment_shader = compile_shader(gl, gl.FRAGMENT_SHADER, plane_fragment_shader_source);
+
+	var plane_program = create_program(gl, plane_vertex_shader, plane_fragment_shader);
+	gl.useProgram(plane_program);
+
+	var plane_u_matrix = gl.getUniformLocation(plane_program, "u_matrix");
+
+
+	//###########################
 	// render loop
 	//###########################
 
 	var scene = new Scene(gl, canvas.clientHeight, canvas.clientWidth, canvas);
-	scene.init_program(vertex_shader_source, fragment_shader_source);
+	scene.init_program(scene_vertex_shader_source, scene_fragment_shader_source);
 
-	for (var i = 0; i < 3; i++) {
-		var radius = 2.5 * Math.random() + 0.5;
-		var sphere_return = create_sphere(Math.random() * radius + 0.5);
-		
-		var vertices = sphere_return.vertices;
-		var normals = sphere_return.normals;
-		var indices = sphere_return.indices;
+	// temporatry objects for a test sim
 
-		var translation = [i * 3, i * 2, 0];
-		var rotation_x = 0;
-		var rotation_y = 0;
+	var sphere1 = create_sphere(5.0);
+	var vertices1 = sphere1.vertices;
+	var normals1 = sphere1.normals;
+	var indices1 = sphere1.indices;
+	var position1 = [30.0, 0.0, 0.0];
+	var rotation_x1 = 0;
+	var rotation_y1 = 0;
+	var mass1 = 50.0;
+	var velocity1 = [0.0, 0.0, 0.0];
 
-		scene.add_object(vertices, normals, indices, translation, rotation_x, rotation_y);
-	}
-	
+	scene.add_object(vertices1, normals1, indices1, position1, rotation_x1, rotation_y1, mass1, velocity1);
+
+	var sphere2 = create_sphere(2.0);
+	var vertices2 = sphere2.vertices;
+	var normals2 = sphere2.normals;
+	var indices2 = sphere2.indices;
+	var position2 = [60.0, 0.0, 0.0];
+	var rotation_x2 = 0;
+	var rotation_y2 = 0;
+	var mass2 = 1.0;
+	var velocity2 = [0.0, 0.0, 0.4];
+
+	scene.add_object(vertices2, normals2, indices2, position2, rotation_x2, rotation_y2, mass2, velocity2);
+
+	var cur = 0;
+	var prev = 0;
+	var dt = 0;
+
 	var render = function (now) {
 		// calculate fps
 		fpsElem.textContent = compute_average_fps(now).toFixed(1);
+
+		// update dt
+		prev = cur;
+		cur = performance.now();
+
+		dt = (cur - prev) / 1000;
 
 		gl.clearColor(0.0, 0.25, 0.0, 0.5);
 		gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
 
 		scene.draw_scene();
+
+		gl.useProgram(plane_program);
+		gl.uniformMatrix4fv(plane_u_matrix, false, scene.view_proj_matrix);
+		gl.drawArrays(gl.TRIANGLES, 0, 6);
 
 		requestAnimationFrame(render);
 	};
