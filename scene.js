@@ -87,14 +87,14 @@ export class Scene {
 
         this.camera.transform(movement, wheel, this.view_matrix);
 
-        // this.get_object_acceleration();
+        this.get_object_acceleration();
 
         for (var i = 0; i < this.objects.length; i++) {
             this.draw_object(this.objects[i], attribute_setters, uniform_setters);
         }
     }
 
-    add_object(vertices, normals, indices, position, rotation_x, rotation_y, mass, velocity) {
+    add_object(vertices, normals, indices, position, rotation_x, rotation_y, mass, velocity, is_light_source) {
         var attributes = {
             pos: { size: 3, data: new Float32Array(vertices) },
             normal: { size: 3, data: new Float32Array(normals) },
@@ -108,7 +108,10 @@ export class Scene {
             u_reverse_light: { data: new Float32Array(this.uniform_reverse_light) },
             u_color: { data: new Float32Array(this.get_random_rgb_value()) },
             u_world_matrix: { data: mat4.create() },
+            u_is_light_source: { data: (is_light_source)? 1.0 : 0.0 },
         };
+
+        console.log(object_uniforms.u_is_light_source.data)
 
         var obj = {
             // rendering properties
