@@ -1,6 +1,8 @@
 import { Camera } from "./camera.js";
 import { InputManager } from "./input_manager.js";
 
+import { create_sphere } from "./mesh.js";
+
 const { mat2, mat2d, mat4, mat3, quat, quat2, vec2, vec3, vec4 } = glMatrix;
 
 import {
@@ -80,7 +82,7 @@ export class Scene {
         var movement = this.input_manager.get_move_vector();
 		var wheel = this.input_manager.get_wheel_vector(direction);
 
-        mat4.perspective(this.proj_matrix, this.to_radians(45), this.canvas.clientWidth / this.canvas.clientHeight, 0.1, 1000.0);
+        mat4.perspective(this.proj_matrix, this.to_radians(45), this.canvas.clientWidth / this.canvas.clientHeight, 0.1, 10000.0);
 		mat4.lookAt(this.camera_matrix, this.camera.pos, this.camera.look_at, [0, 1, 0]);
 		mat4.invert(this.view_matrix, this.camera_matrix);
 		mat4.mul(this.view_proj_matrix, this.proj_matrix, this.camera_matrix);
@@ -162,6 +164,31 @@ export class Scene {
 
             vec3.add(this.objects[i].velocity, this.objects[i].velocity, acceleration);
             vec3.add(this.objects[i].position, this.objects[i].position, this.objects[i].velocity)
+        }
+    }
+
+    generate_gravity_sim(n) {
+        const min_pos = -1000;
+        const max_pos = 1000;
+
+        const min_mass = 1.0;
+        const max_mass = 10;
+
+        const min_velocity = -5;
+        const max_velocity = 5;
+
+        for (var i = 0; i < n; i++) {
+            var sphere = create_sphere(5.0);
+
+            var vertices = sphere.vertices;
+            var normals = sphere.normals;
+            var indices = sphere.indices;
+
+            var position = [Math.random() * (max_pos - min_pos) + min_pos, Math.random() * (max_pos - min_pos) + min_pos, Math.random() * (max_pos - min_pos) + min_pos];
+            var mass = Math.random() * (max_mass - min_mass) + min_mass;
+            var velocity = [Math.random() * (max_velocity - min_velocity) + min_velocity, Math.random() * (max_velocity - min_velocity) + min_velocity, Math.random() * (max_velocity - min_velocity) + min_velocity];
+
+            this.add_object(vertices, normals, indices, position, 0, 0, mass, velocity, false);
         }
     }
 }

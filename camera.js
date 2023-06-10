@@ -2,7 +2,7 @@ const { mat4, vec3, vec4 } = glMatrix;
 
 export class Camera {
     constructor(viewport_width, viewport_height) {
-        this.pos = [0, 0, 10];
+        this.pos = [0, 0, 1000];
         this.look_at = [0, 0, 0];
 
         this.translate_sensitivity = 0.01;
