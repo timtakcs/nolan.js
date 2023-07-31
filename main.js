@@ -160,21 +160,22 @@ var skybox_vertex_shader_source = [
 	'precision mediump float;',
 	'',
 	'const vec3 positions[6] = vec3[](',
-	'    vec3(1, 1, 0),',
-	'    vec3(-1, -1, 0),',
-	'    vec3(-1, 1, 0),',
-	'    vec3(-1, -1, 0),',
-	'    vec3(1, 1, 0),',
-	'    vec3(1, -1, 0)',
+	'    vec3(-1, 1, -1),',
+	'    vec3(-1, -1, -1),',
+	'    vec3(1, -1, -1),',
+	'    vec3(1, -1, -1),',
+	'    vec3(1, 1, -1),',
+	'    vec3(-1, 1, -1)',
 	');',
+	'',
+	'uniform mat4 u_view;',
 	'',
 	'out vec3 frag_pos;',
 	'',
 	'void main() {',
 	'	 vec3 pos = positions[gl_VertexID];',
-	'    frag_pos = pos;',
+	'    frag_pos = (u_view * vec4(pos, 1.0)).xyz;',
 	'    gl_Position = vec4(pos, 1.0);',
-	'	 gl_Position.z = 1.0;',
 	'}'
 ].join("\n");
 
@@ -186,13 +187,12 @@ var skybox_fragment_shader_source = [
 	'out vec4 out_color;',
 	'',
 	'uniform samplerCube u_skybox;',
-	'uniform mat4 u_view_matrix_inverse;',
 	'',
 	'void main() {',
-	'    vec4 t = u_view_matrix_inverse * vec4(frag_pos, 1.0);',
-	'    out_color = texture(u_skybox, normalize(t.xyz / t.w));',
+	'    out_color = texture(u_skybox, normalize(frag_pos));',
 	'}'
 ].join("\n");
+
 
 var pyramid = [
 	-1.0, 0.0, 1.0,
@@ -293,6 +293,7 @@ function main() {
 	//###########################
 	// fps counter
 	//###########################
+
 	const fpsElem = document.querySelector("#fps");
 	const frameTimes = [];
 	let frameCursor = 0;
@@ -337,9 +338,10 @@ function main() {
 
 	var skybox_program = create_program(gl, skybox_vertex_shader, skybox_fragment_shader);
 
-	var skybox_pos_location = gl.getAttribLocation(skybox_program, "pos");
+	// var skybox_pos_location = gl.getAttribLocation(skybox_program, "a_pos");
 	var skybox_location = gl.getUniformLocation(skybox_program, "u_skybox");
-	var skybox_view_matrix_inverse_location = gl.getUniformLocation(skybox_program, "u_view_matrix_inverse");
+	var skybox_matrix_location = gl.getUniformLocation(skybox_program, "u_view");
+
 
 	var texture = gl.createTexture();
 	gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
@@ -404,7 +406,7 @@ function main() {
 			}
 		});
 	});
-
+	
 	//###########################
 	// render loop
 	//###########################
@@ -414,37 +416,39 @@ function main() {
 
 	// temporatry objects for a test sim
 
-	scene.generate_gravity_sim(250);
+	// scene.generate_gravity_sim(250);
 
-	// var sphere1 = create_sphere(5.0);
-	// var vertices1 = sphere1.vertices;
-	// var normals1 = sphere1.normals;
-	// var indices1 = sphere1.indices;
-	// var position1 = [0.0, 0.0, 0.0];
-	// var rotation_x1 = 0;
-	// var rotation_y1 = 0;
-	// var mass1 = 100.0;
-	// var velocity1 = [0.0, 0.0, 0.0];
-	// var is_light_source1 = true;
+	var sphere1 = create_sphere(5.0);
+	var vertices1 = sphere1.vertices;
+	var normals1 = sphere1.normals;
+	var indices1 = sphere1.indices;
+	var position1 = [0.0, 0.0, 0.0];
+	var rotation_x1 = 0;
+	var rotation_y1 = 0;
+	var mass1 = 100.0;
+	var velocity1 = [0.0, 0.0, 0.0];
+	var is_light_source1 = true;
 
-	// scene.add_object(vertices1, normals1, indices1, position1, rotation_x1, rotation_y1, mass1, velocity1, is_light_source1);
+	scene.add_object(vertices1, normals1, indices1, position1, rotation_x1, rotation_y1, mass1, velocity1, is_light_source1);
 
-	// var sphere2 = create_sphere(2.0);
-	// var vertices2 = sphere2.vertices;
-	// var normals2 = sphere2.normals;
-	// var indices2 = sphere2.indices;
-	// var position2 = [30.0, 0.0, 0.0];
-	// var rotation_x2 = 0;
-	// var rotation_y2 = 0;
-	// var mass2 = 1.0;
-	// var velocity2 = [0.0, 0.0, 0.4];
-	// var is_light_source2 = false;
+	var sphere2 = create_sphere(2.0);
+	var vertices2 = sphere2.vertices;
+	var normals2 = sphere2.normals;
+	var indices2 = sphere2.indices;
+	var position2 = [30.0, 0.0, 0.0];
+	var rotation_x2 = 0;
+	var rotation_y2 = 0;
+	var mass2 = 1.0;
+	var velocity2 = [0.0, 0.0, 0.4];
+	var is_light_source2 = false;
 
-	// scene.add_object(vertices2, normals2, indices2, position2, rotation_x2, rotation_y2, mass2, velocity2, is_light_source2);
+	scene.add_object(vertices2, normals2, indices2, position2, rotation_x2, rotation_y2, mass2, velocity2, is_light_source2);
 
 	var cur = 0;
 	var prev = 0;
 	var dt = 0;
+
+	console.log(gl.getError());
 
 	var render = function (now) {
 		// calculate fps
@@ -459,23 +463,22 @@ function main() {
 		gl.clearColor(0.0, 0.0, 0.0, 1.0);
 		gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
 
-		var temp_mat = scene.view_proj_matrix.slice();
+		var temp_mat = scene.view_matrix.slice();
 
-		temp_mat[12] = 1.0;
-		temp_mat[13] = 1.0;
-		temp_mat[14] = 1.0;
+		temp_mat[12] = 0;
+		temp_mat[13] = 0;
+		temp_mat[14] = 0;
 
-		var view_proj_matrix_inverse = mat4.create();
-		mat4.invert(view_proj_matrix_inverse, temp_mat);
+		// var view_proj_matrix_inverse = mat4.create();
+		// mat4.invert(view_proj_matrix_inverse, temp_mat);
 	
-
-		// gl.depthMask(false);
-		// gl.useProgram(skybox_program);
-		// gl.uniformMatrix4fv(skybox_view_matrix_inverse_location, false, view_proj_matrix_inverse);
-		// gl.uniform1i(skybox_location, 0);
-		// gl.depthFunc(gl.LEQUAL);
-		// gl.drawArrays(gl.TRIANGLES, 0, 6);
-		// gl.depthMask(true);
+		gl.depthMask(false);
+		gl.useProgram(skybox_program);
+		gl.uniformMatrix4fv(skybox_matrix_location, false, temp_mat);
+		gl.uniform1i(skybox_location, 0);
+		gl.depthFunc(gl.LEQUAL);
+		gl.drawArrays(gl.TRIANGLES, 0, 36);
+		gl.depthMask(true);
 
 		// gl.depthMask(false);
 		// gl.useProgram(plane_program);

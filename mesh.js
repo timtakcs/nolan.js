@@ -3,8 +3,8 @@ export function create_sphere(radius) {
     var normals = [];
     var indices = [];
 
-    var latitudeBands = 6;
-    var longitudeBands = 6;
+    var latitudeBands = 12;
+    var longitudeBands = 12;
     var radius = radius;
 
     for (var latNumber = 0; latNumber <= latitudeBands; ++latNumber) {
