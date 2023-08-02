@@ -28,6 +28,9 @@ export class Scene {
 
         //temporary static things that will be made dynamic later
         this.uniform_reverse_light = [-0.5, 0.0, -1.0];
+
+        this.draw_plane = true;
+        this.draw_skybox = true;
     }
 
     get_random_rgb_value() {
@@ -69,6 +72,10 @@ export class Scene {
         } else {
             this.gl.drawArrays(this.gl.TRIANGLES, 0, 18);
         }
+    }
+
+    draw_skybox() {
+        
     }
 
     draw_scene() {

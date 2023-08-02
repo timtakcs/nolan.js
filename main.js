@@ -73,7 +73,6 @@ var plane_vertex_shader_source = [
 	'#version 300 es',
 	'precision mediump float;',
 	'',
-	// 'in vec3 pos;',
 	'uniform mat4 u_matrix;',
 	'',
 	'out vec3 near_point;',
@@ -104,6 +103,57 @@ var plane_vertex_shader_source = [
 	'}'
 ].join("\n");
 
+// var plane_fragment_shader_source = [
+// 	'#version 300 es',
+// 	'precision highp float;',
+// 	'',
+// 	'in vec3 near_point;',
+// 	'in vec3 far_point;',
+// 	'in mat4 frag_u_matrix;',
+// 	'',
+// 	'out vec4 out_color;',
+// 	'',
+// 	'vec4 grid(vec3 fragPos3D, float scale) {',
+// 	'    vec2 coord = fragPos3D.xy / scale;',
+// 	'    vec2 derivative = fwidth(coord);',
+// 	'    vec2 grid = abs(fract(coord - 0.4)- 0.5) / derivative;',
+// 	'    float line = min(grid.x, grid.y);',
+// 	'    float minimumz = min(derivative.y, 1.0);',
+// 	'    float minimumx = min(derivative.x, 1.0);',
+// 	'    vec4 color = vec4(0.1, 0.1, 0.1, 1.0 - min(line, 1.0));',
+// 	'    // z axis',
+// 	'    if (fragPos3D.x > -0.1 * minimumx && fragPos3D.x < 0.1 * minimumx)',
+// 	'        color.x = 1.0;',
+// 	'    // x axis',
+// 	'    if (fragPos3D.z > -0.1 * minimumz && fragPos3D.z < 0.1 * minimumz)',
+// 	'        color.z = 1.0;',
+// 	'    return color;',
+// 	'}',
+// 	'',
+// 	'float compute_depth(vec3 pos) {',
+// 	'    vec4 clip_pos = frag_u_matrix * vec4(pos, 1.0);',
+// 	'    return clip_pos.z / clip_pos.w;',
+// 	'}',
+// 	'',
+// 	'float compute_linear_depth(vec3 pos) {',
+// 	'    float near = 0.1;',
+// 	'    float far = 100.0;',
+// 	'    vec4 clip_pos = frag_u_matrix * vec4(pos, 1.0);',
+// 	'    float clip_depth = (clip_pos.z / clip_pos.w) * 2.0 - 1.0;',
+// 	'    float linear_depth = (2.0 * near * far) / (far + near - clip_depth * (far - near));',
+// 	'    return linear_depth / far;',
+// 	'}',
+// 	'',
+// 	'void main() {',
+// 	'    float t = -near_point.y / (far_point.y - near_point.y);',
+// 	'    vec3 fragPos3D = near_point + t * (far_point - near_point);',
+// 	'	 gl_FragDepth = compute_depth(fragPos3D);',
+// 	// '    float fading = max(0.0, 0.5 - compute_linear_depth(fragPos3D));',
+// 	'    out_color = grid(fragPos3D, 1.0) * float(t > 0.0);',
+// 	// '    out_color.a *= fading;',
+// 	'}'
+// ].join("\n");
+
 var plane_fragment_shader_source = [
 	'#version 300 es',
 	'precision highp float;',
@@ -115,18 +165,17 @@ var plane_fragment_shader_source = [
 	'out vec4 out_color;',
 	'',
 	'vec4 grid(vec3 fragPos3D, float scale) {',
-	'    vec2 coord = fragPos3D.xy / scale;',
-	'    vec2 derivative = fwidth(coord);',
-	'    vec2 grid = abs(fract(coord - 0.4)- 0.5) / derivative;',
+	'    vec2 coord = fragPos3D.xz / scale;',
+	'    vec2 grid = abs(fract(coord - 0.5) - 0.5);',
 	'    float line = min(grid.x, grid.y);',
-	'    float minimumz = min(derivative.y, 1.0);',
-	'    float minimumx = min(derivative.x, 1.0);',
-	'    vec4 color = vec4(0.1, 0.1, 0.1, 1.0 - min(line, 1.0));',
+	'    vec4 color = vec4(0.0, 0.0, 0.0, 0.0);',
+	'    if (line < 0.02)',
+	'        color = vec4(0.3, 0.3, 0.3, 1.0);',
 	'    // z axis',
-	'    if (fragPos3D.x > -0.1 * minimumx && fragPos3D.x < 0.1 * minimumx)',
+	'    if (abs(fragPos3D.x) < 0.1)',
 	'        color.z = 1.0;',
 	'    // x axis',
-	'    if (fragPos3D.z > -0.1 * minimumz && fragPos3D.z < 0.1 * minimumz)',
+	'    if (abs(fragPos3D.z) < 0.1)',
 	'        color.x = 1.0;',
 	'    return color;',
 	'}',
@@ -149,9 +198,9 @@ var plane_fragment_shader_source = [
 	'    float t = -near_point.y / (far_point.y - near_point.y);',
 	'    vec3 fragPos3D = near_point + t * (far_point - near_point);',
 	'	 gl_FragDepth = compute_depth(fragPos3D);',
-	// '    float fading = max(0.0, 0.5 - compute_linear_depth(fragPos3D));',
+	'    float fading = max(0.0, 0.6 - compute_linear_depth(fragPos3D));',
 	'    out_color = grid(fragPos3D, 10.0) * float(t > 0.0);',
-	// '    out_color.a *= fading;',
+	'    out_color.a *= fading;',
 	'}'
 ].join("\n");
 
@@ -469,8 +518,6 @@ function main() {
 		temp_mat[13] = 0;
 		temp_mat[14] = 0;
 
-		// var view_proj_matrix_inverse = mat4.create();
-		// mat4.invert(view_proj_matrix_inverse, temp_mat);
 	
 		gl.depthMask(false);
 		gl.useProgram(skybox_program);
@@ -480,11 +527,11 @@ function main() {
 		gl.drawArrays(gl.TRIANGLES, 0, 36);
 		gl.depthMask(true);
 
-		// gl.depthMask(false);
-		// gl.useProgram(plane_program);
-		// gl.uniformMatrix4fv(plane_u_matrix, false, scene.view_proj_matrix);
-		// gl.drawArrays(gl.TRIANGLES, 0, 6);
-		// gl.depthMask(true);
+		gl.depthMask(false);
+		gl.useProgram(plane_program);
+		gl.uniformMatrix4fv(plane_u_matrix, false, scene.view_proj_matrix);
+		gl.drawArrays(gl.TRIANGLES, 0, 6);
+		gl.depthMask(true);
 
 		scene.draw_scene();
 
