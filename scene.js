@@ -1,7 +1,7 @@
 import { Camera } from "./camera.js";
 import { InputManager } from "./input_manager.js";
-
 import { create_sphere } from "./mesh.js";
+import { build_tree, print_tree } from "./barnes_hut.js";
 
 const { mat2, mat2d, mat4, mat3, quat, quat2, vec2, vec3, vec4 } = glMatrix;
 

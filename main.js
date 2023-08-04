@@ -63,7 +63,7 @@ var scene_fragment_shader_source = [
 	'    	vec3 normal = normalize(frag_normal);',
 	'    	float light = dot(normal, u_reverse_light);',
 	'    	out_color = u_color;',
-	// '    	out_color.rgb *= light;',
+	'    	out_color.rgb *= light;',
 	'	}',
 	'}'
 ].join("\n");
@@ -102,57 +102,6 @@ var plane_vertex_shader_source = [
 	'    gl_Position = vec4(p, 1.0);',
 	'}'
 ].join("\n");
-
-// var plane_fragment_shader_source = [
-// 	'#version 300 es',
-// 	'precision highp float;',
-// 	'',
-// 	'in vec3 near_point;',
-// 	'in vec3 far_point;',
-// 	'in mat4 frag_u_matrix;',
-// 	'',
-// 	'out vec4 out_color;',
-// 	'',
-// 	'vec4 grid(vec3 fragPos3D, float scale) {',
-// 	'    vec2 coord = fragPos3D.xy / scale;',
-// 	'    vec2 derivative = fwidth(coord);',
-// 	'    vec2 grid = abs(fract(coord - 0.4)- 0.5) / derivative;',
-// 	'    float line = min(grid.x, grid.y);',
-// 	'    float minimumz = min(derivative.y, 1.0);',
-// 	'    float minimumx = min(derivative.x, 1.0);',
-// 	'    vec4 color = vec4(0.1, 0.1, 0.1, 1.0 - min(line, 1.0));',
-// 	'    // z axis',
-// 	'    if (fragPos3D.x > -0.1 * minimumx && fragPos3D.x < 0.1 * minimumx)',
-// 	'        color.x = 1.0;',
-// 	'    // x axis',
-// 	'    if (fragPos3D.z > -0.1 * minimumz && fragPos3D.z < 0.1 * minimumz)',
-// 	'        color.z = 1.0;',
-// 	'    return color;',
-// 	'}',
-// 	'',
-// 	'float compute_depth(vec3 pos) {',
-// 	'    vec4 clip_pos = frag_u_matrix * vec4(pos, 1.0);',
-// 	'    return clip_pos.z / clip_pos.w;',
-// 	'}',
-// 	'',
-// 	'float compute_linear_depth(vec3 pos) {',
-// 	'    float near = 0.1;',
-// 	'    float far = 100.0;',
-// 	'    vec4 clip_pos = frag_u_matrix * vec4(pos, 1.0);',
-// 	'    float clip_depth = (clip_pos.z / clip_pos.w) * 2.0 - 1.0;',
-// 	'    float linear_depth = (2.0 * near * far) / (far + near - clip_depth * (far - near));',
-// 	'    return linear_depth / far;',
-// 	'}',
-// 	'',
-// 	'void main() {',
-// 	'    float t = -near_point.y / (far_point.y - near_point.y);',
-// 	'    vec3 fragPos3D = near_point + t * (far_point - near_point);',
-// 	'	 gl_FragDepth = compute_depth(fragPos3D);',
-// 	// '    float fading = max(0.0, 0.5 - compute_linear_depth(fragPos3D));',
-// 	'    out_color = grid(fragPos3D, 1.0) * float(t > 0.0);',
-// 	// '    out_color.a *= fading;',
-// 	'}'
-// ].join("\n");
 
 var plane_fragment_shader_source = [
 	'#version 300 es',
@@ -465,7 +414,7 @@ function main() {
 
 	// temporatry objects for a test sim
 
-	// scene.generate_gravity_sim(250);
+	// scene.generate_gravity_sim(3);
 
 	var sphere1 = create_sphere(5.0);
 	var vertices1 = sphere1.vertices;
