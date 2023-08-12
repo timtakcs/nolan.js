@@ -76,6 +76,8 @@ function subdivide(node) {
 }
 
 function insert(body, node) {
+    node.mass += body.mass;
+
     if (node.children === null) {
         if (node.body === null) {
             node.body = body;
@@ -111,6 +113,21 @@ export function build_tree(objects) {
     
     return root;
 }
+
+// Calculating the forces
+
+function get_force(body, node, theta) {
+    if (node.body === null) {
+        const d = vec3.distance(body.position, node.center);
+        const s = Math.abs(node.max_point[0] - node.min_point[0]);
+
+        if (s / d < theta) {
+            
+        }
+    }
+}
+
+// misc
 
 export function print_tree(root) {
     console.log(root.max_point, root.min_point, root.center);
